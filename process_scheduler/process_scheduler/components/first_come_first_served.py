@@ -9,8 +9,7 @@ def first_come_first_served_modificated(self):
             memory_demand_less_priority_processes += sum(map(lambda p: p.memory, less_priority_processes_blocked))
             
             if memory_demand_less_priority_processes >= process.memory:
-                
-            
+                pass
             if sum(map(lambda p: p.memory, less_priority_processes_ready)) >= process.memory:
                 for p in less_priority_processes_ready:
                     if self.memory - process.memory <= 0:

@@ -1,4 +1,4 @@
-from .components import *
+from process_scheduler.components import *
 
 
 import matplotlib.pyplot as plt
