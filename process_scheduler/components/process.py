@@ -79,11 +79,15 @@ class Process:
         metrics = {
             "PID"  : self.pid,
             "CPU demand" : self.cpu_demand,
+            "CPU allocated" : self.allocated,
             "Memory demand"  : self.memory_demand,
             "Priority" : self.priority,
             "Status" : self.status,
+            "Continuous time in CPU" : self.continuous_cpu_time,
             "Created" : self.start
         }
+        
+        return metrics
         
     @classmethod
     def collect(cls) -> list:

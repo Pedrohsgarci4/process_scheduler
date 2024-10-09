@@ -4,7 +4,7 @@ def round_robin(process_manager : object):
     global quantum
     
     for process in process_manager.running:
-        if process.continuos_cpu_time >= quantum:
+        if process.continuous_cpu_time >= quantum:
             process_manager.running.remove(process)
             process_manager.cpu_idle += process.allocated
             process.allocate_cpu_time()

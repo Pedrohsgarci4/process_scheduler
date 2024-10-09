@@ -3,6 +3,7 @@ from process_scheduler.components.scheduling_algorithms import *
 from process_scheduler.components.process_generator import *
 
 import json
+import matplotlib.pyplot as plt
 import os
 
 class ProcessManager:
@@ -17,12 +18,7 @@ class ProcessManager:
                  scheduling_algorithm: callable = first_create_first_served,
                  priority_algorithm : callable = lambda process: process.start
                  ) -> None:
-        """
-        Args:
-            process_generator : object -> Object responsible for generating specifications for new processes
-            memory : int -> Memory capacity
-            cpu : int -> CPU capacity
-        """
+        
         self.steps = 0
         self.memory = memory
         self.memory_idle = memory
@@ -71,7 +67,7 @@ class ProcessManager:
         
         # Helper function to extract (pid, allocated_cpu) pairs from each process in the queue
         def extract_process_info(queue):
-            return [(process.pid, process.allocated, process.cpu_demand, process.memory_demand) for process in queue]
+            return [ process.metrics() for process in queue]
         
         # Shift the process queues data to the left and append the current states of the queues
         self.agent_metrics['new'].append(extract_process_info(self.new))
@@ -88,11 +84,12 @@ class ProcessManager:
             self.step()
             self.monitor()
             self.print()
-            # input()
+            input()
             os.system("clear")
         
         # Salvar as métricas ao final da execução
         self.save_metrics_to_json()
+        self.calculate_and_plot_times()
     
                 
             
@@ -214,7 +211,7 @@ class ProcessManager:
             for step, processes in enumerate(queue_data, 1):
                 print(f"Step {step}: ", end="")
                 if processes:
-                    process_info = ", ".join([f"(PID: {pid}, CPU: {cpu}, CPU demand: {cpu_demand}, Memory demand: {mem_demand})" for pid, cpu, cpu_demand, mem_demand in processes])
+                    process_info = ", ".join([f"(PID: {process['PID']}, CPU: {process['CPU allocated']}, CPU demand: {process['CPU demand']}, Memory demand: {process['Memory demand']}, Priority: {process['Priority']})" for process in processes if process != None])
                     print(process_info)
                 else:
                     print("Nenhum processo")
@@ -265,3 +262,74 @@ class ProcessManager:
         # Salvar as métricas em um arquivo JSON
         with open(f"metrics_{self.scheduling_algorithm.__name__}-{self.priority_algorithm.__name__}.json", "w") as json_file:
             json.dump(metrics, json_file, indent=4)
+
+
+    def calculate_and_plot_times(self):
+        """
+        Calculate waiting time and response time for each process based on its metrics, and plot the results.
+        """
+        waiting_times = {}
+        response_times = {}
+        total_waiting_time = 0
+        total_response_time = 0
+    
+        def record_times_for_process(process, step):
+            """
+            Helper function to record waiting and response times for a given process.
+            """
+            nonlocal total_waiting_time, total_response_time
+            
+            pid = process["PID"]
+    
+            # Calculate waiting time: time the process spent not in 'running' state
+            if pid not in waiting_times:
+                waiting_times[pid] = 0
+            if process["Status"] != "running":
+                waiting_times[pid] += 1
+                total_waiting_time += 1
+    
+            # Calculate response time: time from creation to the first time the process is in 'running' state
+            if pid not in response_times:
+                if process["Status"] == "running":
+                    response_times[pid] = step - process["Created"]
+                    total_response_time += response_times[pid]
+    
+        # Iterate over all processes to calculate waiting and response times
+        for step in range(len(self.agent_metrics['new'])):
+            for process in self.agent_metrics['ready'][step]:
+                record_times_for_process(process, step)
+            for process in self.agent_metrics['ready_suspend'][step]:
+                record_times_for_process(process, step)
+            for process in self.agent_metrics['blocked'][step]:
+                record_times_for_process(process, step)
+            for process in self.agent_metrics['blocked_suspend'][step]:
+                record_times_for_process(process, step)
+            for process in self.agent_metrics['running'][step]:
+                record_times_for_process(process, step)
+    
+        # Calculate averages
+        process_count = len(waiting_times)
+        avg_waiting_time = total_waiting_time / process_count if process_count > 0 else 0
+        avg_response_time = total_response_time / process_count if process_count > 0 else 0
+    
+        # Prepare data for plotting
+        process_ids = sorted(waiting_times.keys())
+        waiting_values = [waiting_times[pid] for pid in process_ids]
+        response_values = [response_times.get(pid, 0) for pid in process_ids]  # Default to 0 if no response time recorded
+    
+        # Create the plot
+        plt.figure(figsize=(10, 6))
+    
+        plt.bar(process_ids, waiting_values, width=0.4, label="Waiting Time", align='center', alpha=0.7)
+        plt.bar(process_ids, response_values, width=0.4, label="Response Time", align='edge', alpha=0.7)
+    
+        plt.xlabel('Process ID')
+        plt.ylabel('Time (Steps)')
+        plt.title('Waiting Time and Response Time per Process')
+        plt.legend(loc="upper right")
+        plt.xticks(process_ids)
+    
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(f"metrics_{self.scheduling_algorithm.__name__}-{self.priority_algorithm.__name__}.png")
+    
