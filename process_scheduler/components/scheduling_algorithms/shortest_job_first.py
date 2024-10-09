@@ -12,5 +12,5 @@ def shortest_job_first(process_manager):
         
         allocated = min(process.cpu_demand, process_manager.cpu_idle) 
         
-        process.allocated_cpu_time(allocated)
+        process.allocate_cpu_time(allocated)
         process_manager.cpu_idle -= allocated

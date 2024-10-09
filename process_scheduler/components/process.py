@@ -21,6 +21,7 @@ class Process:
         self.cpu_demand = cpu_demand
         self.memory_demand = memory_demand
         self.priority = priority
+        self.continuous_cpu_time = 0
         
         
         if event_generator == []:
@@ -38,13 +39,13 @@ class Process:
         
     def step(self):
         if self.allocated > 0:
-            self.status = "running"
             
-            print(self.cpu_demand)
-            # Executar o processo e reduzir a demanda de CPU
-            self.cpu_demand = max(0, self.cpu_demand - self.allocated)  # Garante que não seja menor que 0
+            if self.status != "running":
+                self.status = "running"
+
+            self.continuous_cpu_time += self.allocated
+            self.cpu_demand = max(0, self.cpu_demand - self.allocated)
             
-            print(self.cpu_demand)
 
             # Checa se o processo gera um evento (por exemplo, se ele precisa ser bloqueado)
             event = next(self.event_generator)
@@ -65,22 +66,35 @@ class Process:
         self.history.append(self.status)
         
         
-    def allocated_cpu_time(self, cpu_time : int = 0):
-        self.allocated = cpu_time
         
-    def metrics(self):
+    def allocate_cpu_time(self, cpu_time : int = 0):
+        self.allocated = max(0, cpu_time)
+        
+        if self.allocated > 0:
+            self.status = 'running'
+        else:
+            self.status = 'ready'
+        
+    def metrics(self) -> dict:
         metrics = {
-            "status" : self.status,
-            "PID" : self.pid,
-            "CPU Demand" : self.cpu_demand,
-            "Memory Demand" : self.memory_demand
+            "PID"  : self.pid,
+            "CPU demand" : self.cpu_demand,
+            "Memory demand"  : self.memory_demand,
+            "Priority" : self.priority,
+            "Status" : self.status,
+            "Created" : self.start
         }
         
-        return metrics
-    
+    @classmethod
+    def collect(cls) -> list:
+             
+        return [
+            process.metrics() for process in cls.all()
+        ]
+        
     @classmethod
     def all(cls):
-        return deepcopy(cls._instances)
+        return cls._instances.copy()
         
         
         

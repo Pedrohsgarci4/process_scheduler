@@ -2,6 +2,7 @@ from process_scheduler.components.process import*
 from process_scheduler.components.scheduling_algorithms import *
 from process_scheduler.components.process_generator import *
 
+import json
 import os
 
 class ProcessManager:
@@ -12,8 +13,8 @@ class ProcessManager:
     def __init__(self,
                  process_generator: object,
                  memory: int,
-                 cpu: int,
-                 scheduling_algorithm: callable = fcfs,
+                 cpu_capacity: int,
+                 scheduling_algorithm: callable = first_create_first_served,
                  priority_algorithm : callable = lambda process: process.start
                  ) -> None:
         """
@@ -26,7 +27,7 @@ class ProcessManager:
         self.memory = memory
         self.memory_idle = memory
         
-        self.cpu = cpu
+        self.cpu = cpu_capacity
         self.cpu_idle = 0
         
         
@@ -73,27 +74,27 @@ class ProcessManager:
             return [(process.pid, process.allocated, process.cpu_demand, process.memory_demand) for process in queue]
         
         # Shift the process queues data to the left and append the current states of the queues
-        self.agent_metrics['new'] = self.agent_metrics['new'][1:] + [extract_process_info(self.new)]
-        self.agent_metrics['ready'] = self.agent_metrics['ready'][1:] + [extract_process_info(self.ready)]
-        self.agent_metrics['ready_suspend'] = self.agent_metrics['ready_suspend'][1:] + [extract_process_info(self.ready_suspend)]
-        self.agent_metrics['running'] = self.agent_metrics['running'][1:] + [extract_process_info(self.running)]
-        self.agent_metrics['blocked'] = self.agent_metrics['blocked'][1:] + [extract_process_info(self.blocked)]
-        self.agent_metrics['blocked_suspend'] = self.agent_metrics['blocked_suspend'][1:] + [extract_process_info(self.blocked_suspend)]
-        self.agent_metrics['exit'] = self.agent_metrics['exit'][1:] + [extract_process_info(self.exit)]
+        self.agent_metrics['new'].append(extract_process_info(self.new))
+        self.agent_metrics['ready'].append(extract_process_info(self.ready))
+        self.agent_metrics['ready_suspend'].append(extract_process_info(self.ready_suspend))
+        self.agent_metrics['running'].append(extract_process_info(self.running))
+        self.agent_metrics['blocked'].append(extract_process_info(self.blocked))
+        self.agent_metrics['blocked_suspend'].append(extract_process_info(self.blocked_suspend))
+        self.agent_metrics['exit'].append(extract_process_info(self.exit))
         
-    def run_model(
-         self,
-         stop_condition : callable,
-        ) -> None:
-        
+    def run_model(self, stop_condition: callable) -> None:
         self.monitor()
-        while(not stop_condition()):
+        while not stop_condition():
             self.step()
             self.monitor()
             self.print()
-            input()
+            # input()
             os.system("clear")
-            
+        
+        # Salvar as métricas ao final da execução
+        self.save_metrics_to_json()
+    
+                
             
     
     def step(self):
@@ -107,14 +108,6 @@ class ProcessManager:
         
         self.process_generator.step() 
         
-        self.ready_suspend.extend(self.new)    
-        self.new.clear()
-    
-                    
-        
-                
-                
-                
         # Verificando se há processos na lista de suspensos:
         for process in sorted(self.ready_suspend, key=self.priority_algorithm):
             
@@ -162,10 +155,10 @@ class ProcessManager:
                 self.ready_suspend.remove(process)
                     
                     
-        for process in self.running[:]:
+        for process in self.running:
             if process.status == "blocked":
                 self.running.remove(process) 
-                process.allocated_cpu_time()    
+                process.allocate_cpu_time()    
                 self.blocked.append(process) 
                 
             if process.status == 'finished':
@@ -178,10 +171,10 @@ class ProcessManager:
         for process in self.blocked:
             if process.status != "blocked":
                 if self.memory_idle <= process.memory_demand and self.ready_suspend == []:
-                    self.blocked_suspend.remove(process)     
+                    self.blocked.remove(process)     
                     self.ready.append(process) 
                 else:
-                    self.blocked_suspend.remove(process)     
+                    self.blocked.remove(process)     
                     self.ready_suspend.append(process) 
 
         for process in self.blocked_suspend:
@@ -195,8 +188,12 @@ class ProcessManager:
         
         self.cpu_idle = self.cpu - sum([ process.allocated for process in self.running])
         
-        for process in Process.all():
+        for process in self.blocked + self.blocked_suspend + self.running:
             process.step()
+        
+        
+        self.ready_suspend.extend(self.new)    
+        self.new.clear()
         
     
     def print(self):
@@ -223,13 +220,48 @@ class ProcessManager:
                     print("Nenhum processo")
 
         # Exibir informações das filas
-        print_queue_info("New", self.agent_metrics['new'])
-        print_queue_info("Ready", self.agent_metrics['ready'])
-        print_queue_info("Ready Suspend", self.agent_metrics['ready_suspend'])
-        print_queue_info("Running", self.agent_metrics['running'])
-        print_queue_info("Blocked", self.agent_metrics['blocked'])
-        print_queue_info("Blocked Suspend", self.agent_metrics['blocked_suspend'])
-        print_queue_info("Exit", self.agent_metrics['exit'])
+        print_queue_info("New", self.agent_metrics['new'][-3:])
+        print_queue_info("Ready", self.agent_metrics['ready'][-3:])
+        print_queue_info("Ready Suspend", self.agent_metrics['ready_suspend'][-3:])
+        print_queue_info("Running", self.agent_metrics['running'][-3:])
+        print_queue_info("Blocked", self.agent_metrics['blocked'][-3:])
+        print_queue_info("Blocked Suspend", self.agent_metrics['blocked_suspend'][-3:])
+        print_queue_info("Exit", self.agent_metrics['exit'][-3:])
 
         print("\n=============================================\n") 
 
+
+
+    def save_metrics_to_json(self) -> None:
+        """
+        Collects metrics from the process manager and processes, then saves them to a JSON file.
+
+        Args:
+            process_manager : object -> The instance of ProcessManager to collect metrics from.
+            filename : str -> The name of the output JSON file (default is 'metrics.json').
+        """
+        # Coletar métricas de uso de memória e CPU ociosa
+        metrics = {
+            "steps": self.steps,
+            "memory_usage": self.agent_metrics['memory_usage'],
+            "cpu_idle": self.agent_metrics['cpu_idle'],
+            "queues": {
+                "new": self.agent_metrics['new'],
+                "ready": self.agent_metrics['ready'],
+                "ready_suspend": self.agent_metrics['ready_suspend'],
+                "running": self.agent_metrics['running'],
+                "blocked": self.agent_metrics['blocked'],
+                "blocked_suspend": self.agent_metrics['blocked_suspend'],
+                "exit": self.agent_metrics['exit']
+            }
+        }
+
+        # Coletar métricas de todos os processos
+        process_metrics = [process.metrics() for process in Process.all()]
+
+        # Adicionar as métricas dos processos ao dicionário de métricas
+        metrics["processes"] = process_metrics
+
+        # Salvar as métricas em um arquivo JSON
+        with open(f"metrics_{self.scheduling_algorithm.__name__}-{self.priority_algorithm.__name__}.json", "w") as json_file:
+            json.dump(metrics, json_file, indent=4)
