@@ -19,7 +19,7 @@ class ProcessManager:
                  priority_algorithm : callable = lambda process: process.start
                  ) -> None:
         
-        self.steps = 0
+        self.steps = 1
         self.memory = memory
         self.memory_idle = memory
         
@@ -81,6 +81,9 @@ class ProcessManager:
     def run_model(self, stop_condition: callable) -> None:
         self.monitor()
         while not stop_condition():
+            print("=============================================")
+            print(f"                 {self.steps}                     ")
+            print("=============================================")
             self.step()
             self.monitor()
             self.print()
@@ -119,6 +122,7 @@ class ProcessManager:
                     # Remove o primeiro item(menos prioritario) até ter espaço para carregar o processo
                     while self.memory_idle < process.memory_demand:
                         p = self.blocked.pop()
+                        print(f"Movendo processo de PID {p.pid} de blocked para blocked_suspend")
                         
                         self.blocked_suspend.append(p)
                         
@@ -131,6 +135,7 @@ class ProcessManager:
                         # Carregando o processo para a memória principal
                         self.memory_idle -= process.memory_demand
                         self.ready.append(process)
+                        print(f"Movendo processo de PID {process.pid} de ready_suspend para ready")
                         self.ready_suspend.remove(process)
                     
                     else:
@@ -139,45 +144,54 @@ class ProcessManager:
                             p = self.ready.pop()
 
                             self.ready_suspend.append(p)
+                            
+                            print(f"Movendo processo de PID {p.pid} de ready para ready_suspend")
 
                             self.memory_idle += p.memory_demand
 
                         # Carregando o processo para a memória principal
                         self.memory_idle -= process.memory_demand
                         self.ready.append(process)
+                        print(f"Movendo processo de PID {process.pid} de ready_suspend para ready")
                         self.ready_suspend.remove(process)
             else:
                 self.memory_idle -= process.memory_demand
                 self.ready.append(process)
                 self.ready_suspend.remove(process)
+                print(f"Movendo processo de PID {process.pid} de ready_suspend para ready")
                     
                     
         for process in self.running:
             if process.status == "blocked":
                 self.running.remove(process) 
-                process.allocate_cpu_time()    
+                process.allocate_cpu_time()  
+                
+                print(f"Movendo processo de PID {process.pid} de running para blocked")  
                 self.blocked.append(process) 
                 
             if process.status == 'finished':
                 self.running.remove(process)
                 self.memory_idle += process.memory_demand 
-                self.exit.append(process)     
+                self.exit.append(process)
                 
-                
+                print(f"Movendo processo de PID {process.pid} de running para exit") 
                 
         for process in self.blocked:
             if process.status != "blocked":
-                if self.memory_idle <= process.memory_demand and self.ready_suspend == []:
+                if self.ready_suspend == []:
                     self.blocked.remove(process)     
                     self.ready.append(process) 
+                    print(f"Movendo processo de PID {process.pid} de blocked para ready") 
                 else:
                     self.blocked.remove(process)     
                     self.ready_suspend.append(process) 
+                    print(f"Movendo processo de PID {process.pid} de blocked para ready_suspend") 
 
         for process in self.blocked_suspend:
             if process.status != "blocked":
                 self.blocked_suspend.remove(process)     
                 self.ready_suspend.append(process) 
+                print(f"Movendo processo de PID {process.pid} de blocked_suspend para ready_suspend") 
                 
               
                     
@@ -211,7 +225,7 @@ class ProcessManager:
             for step, processes in enumerate(queue_data, 1):
                 print(f"Step {step}: ", end="")
                 if processes:
-                    process_info = ", ".join([f"(PID: {process['PID']}, CPU: {process['CPU allocated']}, CPU demand: {process['CPU demand']}, Memory demand: {process['Memory demand']}, Priority: {process['Priority']})" for process in processes if process != None])
+                    process_info = ", ".join([f"(PID: {process['PID']}, CPU: {process['CPU allocated']}, CPU demand: {process['CPU demand']}, Memory demand: {process['Memory demand']}, Priority: {process['Priority']}, Status: {process['Status']})" for process in processes if process != None])
                     print(process_info)
                 else:
                     print("Nenhum processo")

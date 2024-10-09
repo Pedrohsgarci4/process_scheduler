@@ -17,7 +17,7 @@ def round_robin(process_manager : object):
         process_manager.running.append(process)  
         
         allocated = min(process.cpu_demand, process_manager.cpu_idle) 
-        allocated = max(allocated, quantum)
+        allocated = min(allocated, quantum)
         
         process.allocate_cpu_time(allocated)
         process_manager.cpu_idle -= allocated
