@@ -85,8 +85,8 @@ class ProcessManager:
             print(f"                 {self.steps}                     ")
             print("=============================================")
             self.step()
-            self.monitor()
-            self.print()
+            
+            
             input()
             os.system("clear")
         
@@ -172,6 +172,7 @@ class ProcessManager:
             if process.status == 'finished':
                 self.running.remove(process)
                 self.memory_idle += process.memory_demand 
+                process.end = self.steps
                 self.exit.append(process)
                 
                 print(f"Movendo processo de PID {process.pid} de running para exit") 
@@ -196,15 +197,19 @@ class ProcessManager:
               
                     
         self.scheduling_algorithm(self)
+        self.monitor()
+        self.print()
         
         self.cpu_idle = self.cpu - sum([ process.allocated for process in self.running])
         
-        for process in self.blocked + self.blocked_suspend + self.running:
+       
+        for process in Process.all():
+        # for process in self.blocked + self.blocked_suspend + self.running:
             process.step()
-        
-        
+            
         self.ready_suspend.extend(self.new)    
         self.new.clear()
+        
         
     
     def print(self):
@@ -282,68 +287,9 @@ class ProcessManager:
         """
         Calculate waiting time and response time for each process based on its metrics, and plot the results.
         """
-        waiting_times = {}
-        response_times = {}
-        total_waiting_time = 0
-        total_response_time = 0
-    
-        def record_times_for_process(process, step):
-            """
-            Helper function to record waiting and response times for a given process.
-            """
-            nonlocal total_waiting_time, total_response_time
-            
-            pid = process["PID"]
-    
-            # Calculate waiting time: time the process spent not in 'running' state
-            if pid not in waiting_times:
-                waiting_times[pid] = 0
-            if process["Status"] != "running":
-                waiting_times[pid] += 1
-                total_waiting_time += 1
-    
-            # Calculate response time: time from creation to the first time the process is in 'running' state
-            if pid not in response_times:
-                if process["Status"] == "running":
-                    response_times[pid] = step - process["Created"]
-                    total_response_time += response_times[pid]
-    
-        # Iterate over all processes to calculate waiting and response times
-        for step in range(len(self.agent_metrics['new'])):
-            for process in self.agent_metrics['ready'][step]:
-                record_times_for_process(process, step)
-            for process in self.agent_metrics['ready_suspend'][step]:
-                record_times_for_process(process, step)
-            for process in self.agent_metrics['blocked'][step]:
-                record_times_for_process(process, step)
-            for process in self.agent_metrics['blocked_suspend'][step]:
-                record_times_for_process(process, step)
-            for process in self.agent_metrics['running'][step]:
-                record_times_for_process(process, step)
-    
-        # Calculate averages
-        process_count = len(waiting_times)
-        avg_waiting_time = total_waiting_time / process_count if process_count > 0 else 0
-        avg_response_time = total_response_time / process_count if process_count > 0 else 0
-    
-        # Prepare data for plotting
-        process_ids = sorted(waiting_times.keys())
-        waiting_values = [waiting_times[pid] for pid in process_ids]
-        response_values = [response_times.get(pid, 0) for pid in process_ids]  # Default to 0 if no response time recorded
-    
-        # Create the plot
-        plt.figure(figsize=(10, 6))
-    
-        plt.bar(process_ids, waiting_values, width=0.4, label="Waiting Time", align='center', alpha=0.7)
-        plt.bar(process_ids, response_values, width=0.4, label="Response Time", align='edge', alpha=0.7)
-    
-        plt.xlabel('Process ID')
-        plt.ylabel('Time (Steps)')
-        plt.title('Waiting Time and Response Time per Process')
-        plt.legend(loc="upper right")
-        plt.xticks(process_ids)
-    
-        plt.grid(True)
-        plt.tight_layout()
-        plt.savefig(f"metrics_{self.scheduling_algorithm.__name__}-{self.priority_algorithm.__name__}.png")
-    
+        print("\n=============================================\n")
+        print("                   Processos                    ")
+        print("\n=============================================\n")
+        
+        for process in Process.all():
+            print(f"PID: {process.pid}, Criado: {process.start}, Demanda: {process.cpu_demand_initial}, Tempo de resposta: {process.end}, Tempo de espera: {len([ h for h in process.history if h == 'ready' or h == 'created'])}, Tempo bloqueado: {len([ h for h in process.history if h == 'blocked'])}")

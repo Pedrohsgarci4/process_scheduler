@@ -16,12 +16,20 @@ class Process:
         
         self.status = "created"
         
+        self.cpu_demand_initial = cpu_demand
+        
         self.start = start
         self.allocated = 0
         self.cpu_demand = cpu_demand
         self.memory_demand = memory_demand
         self.priority = priority
         self.continuous_cpu_time = 0
+        self.event = False
+        self.end = 0
+        
+        
+        self.history = []
+        
         
         
         if event_generator == []:
@@ -61,7 +69,8 @@ class Process:
         
         # Verifica se o processo terminou a execução
         if self.cpu_demand <= 0:
-            self.status = "finished"
+            self.status = "finished" 
+            
             
         self.history.append(self.status)
         
@@ -73,7 +82,7 @@ class Process:
         if self.allocated > 0:
             self.status = 'running'
         else:
-            self.status = 'ready'
+            self.status = 'ready' if not self.event else 'blocked'
         
     def metrics(self) -> dict:
         metrics = {
@@ -84,7 +93,8 @@ class Process:
             "Priority" : self.priority,
             "Status" : self.status,
             "Continuous time in CPU" : self.continuous_cpu_time,
-            "Created" : self.start
+            "Created" : self.start,
+            "End" : self.end
         }
         
         return metrics

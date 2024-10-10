@@ -34,7 +34,7 @@ class ProcessGenerator:
                     cpu_demand=next(self.cpu_demands),
                     memory_demand=next(self.memory_demands),
                     event_generator=next(self.event_generators),
-                    # priority=randint(1,3)
+                    priority=randint(1,3)
                 )
                 
                 new_processes.append(process)

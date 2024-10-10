@@ -9,11 +9,11 @@ from process_scheduler import *
 
 
 def generate_dataset(n_processes=10):
-    process_numbers = [random.randint(1, 3) for _ in range(n_processes)]
-    interval_creation = [random.randint(1, 5) for _ in range(n_processes)]
+    process_numbers = [random.randint(1, 2) for _ in range(n_processes)]
+    interval_creation = [random.randint(1, 3) for _ in range(n_processes)]
     memory_demand = [random.randint(10, 30) for _ in range(n_processes)]
     cpu_demand = [ random.randint(1,5) for _ in range(n_processes)]
-    event_generators = [[random.choice([True, False, False]) for _ in range(15)] for _ in range(n_processes)]
+    event_generators = [[random.choice([True, False]) for _ in range(15)] for _ in range(n_processes)]
     
     return process_numbers, interval_creation, memory_demand, cpu_demand, event_generators
 
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     
     priority_algorithms = {
         "first_come_highest_priority"  : lambda x: 0, # Will not change the order of the queues
-        "priority" : lambda p: p.priority,
+        "priority" : lambda p: 1/p.priority,
         "moment_creation" : lambda p: p.start,# Sort by the time it was created
     }
     
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     process_generator.connect_to_manager(process_manager)
     
     
-    stop_condition = (lambda: process_manager.steps >= int(args.ticks) ) if args.ticks else lambda: process_manager.steps >= 50
+    stop_condition = (lambda: process_manager.steps >= int(args.ticks) ) if args.ticks else lambda: process_manager.steps >= 20
     
     
     process_manager.run_model(stop_condition)
