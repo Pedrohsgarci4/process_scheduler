@@ -114,12 +114,13 @@ class ProcessManager:
             self.ready_suspend.sort(key=self.priority_algorithm)
             self.ready.sort(key=self.priority_algorithm)
 
+            # Checa se a memoria ociosa
             if self.memory_idle < process.memory_demand:
                 
-                # Se houverem processos menos prioritarios bloqueados ocupando memória o suficiente para o processo ser levado para a memória principal 
+                # Checa se a processos menos prioritarios ocupando a memoria necessaria para carregar o processo
                 if sum([ p.memory_demand for p in self.blocked + self.ready if self.priority_algorithm(p) <= self.priority_algorithm(process)]) >= process.memory_demand:
                     
-                    # Remove o primeiro item(menos prioritario) até ter espaço para carregar o processo
+                    # Remove processo bloqueado (menos prioritario) até ter espaço para carregar o processo
                     while self.memory_idle < process.memory_demand:
                         p = self.blocked.pop()
                         print(f"Movendo processo de PID {p.pid} de blocked para blocked_suspend")
@@ -139,7 +140,7 @@ class ProcessManager:
                         self.ready_suspend.remove(process)
                     
                     else:
-                        # Remove o primeiro item(menos prioritario) até ter espaço para carregar o processo
+                        # Remove o processo pronto(menos prioritario) até ter espaço para carregar o processo
                         while self.memory_idle < process.memory_demand:
                             p = self.ready.pop()
 
@@ -204,7 +205,6 @@ class ProcessManager:
         
        
         for process in Process.all():
-        # for process in self.blocked + self.blocked_suspend + self.running:
             process.step()
             
         self.ready_suspend.extend(self.new)    
@@ -252,9 +252,6 @@ class ProcessManager:
         """
         Collects metrics from the process manager and processes, then saves them to a JSON file.
 
-        Args:
-            process_manager : object -> The instance of ProcessManager to collect metrics from.
-            filename : str -> The name of the output JSON file (default is 'metrics.json').
         """
         # Coletar métricas de uso de memória e CPU ociosa
         metrics = {
